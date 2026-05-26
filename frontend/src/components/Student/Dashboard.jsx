@@ -1,39 +1,64 @@
-import { useState } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext.jsx';
+
 import Profile from './Profile.jsx';
+import Settings from './Settings.jsx';
 import Exams from './Exams.jsx';
 import Results from './Results.jsx';
 import TakeExam from './TakeExam.jsx';
 import NotificationBell from './NotificationBell.jsx';
 
 const NAV = [
-  { to: '/',                  icon: '🏠', label: 'Dashboard' },
-  { to: '/student/exams',     icon: '📝', label: 'My Exams' },
-  { to: '/student/results',   icon: '📊', label: 'Results' },
-  { to: '/student/profile',   icon: '👤', label: 'Profile' },
+  { to: '/student', icon: '🏠', label: 'Dashboard' },
+  { to: '/student/exams', icon: '📝', label: 'My Exams' },
+  { to: '/student/results', icon: '🏆', label: 'Results' },
+  { to: '/student/profile', icon: '👤', label: 'Profile' },
+  { to: '/student/settings', icon: '⚙️', label: 'Settings' },
+];
+
+const cards = [
+  { icon: '📚', label: 'My Exams', sub: 'View enrolled exams' },
+  { icon: '📊', label: 'Results', sub: 'See your scores' },
+  { icon: '👤', label: 'Profile', sub: 'Manage your info' },
+  { icon: '🔐', label: 'Settings', sub: 'Change password' },
+  { icon: '🛡️', label: 'Secure', sub: 'Proctored environment' },
 ];
 
 const getInitials = (name = '') =>
-  name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="dashboard">
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="sidebar-brand-icon">📚</div>
+            <div className="sidebar-brand-icon">EX</div>
             <span className="sidebar-brand-name">Examsphere</span>
           </div>
+
           <div className="sidebar-user">
-            <div className="sidebar-avatar">{getInitials(user?.name)}</div>
+            <div className="sidebar-avatar">
+              {getInitials(user?.name)}
+            </div>
+
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user?.name || 'Student'}</div>
+              <div className="sidebar-user-name">
+                {user?.name || 'Student'}
+              </div>
               <div className="sidebar-user-role">Student</div>
             </div>
           </div>
@@ -41,21 +66,27 @@ const StudentDashboard = () => {
 
         <nav className="sidebar-nav">
           <div className="sidebar-nav-label">Navigation</div>
+
           {NAV.map(({ to, icon, label }) => (
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+              className={({ isActive }) =>
+                `sidebar-link${isActive ? ' active' : ''}`
+              }
             >
-              <span className="sidebar-link-icon">{icon}</span>
-              {label}
+              <span className="sidebar-link-icon">
+                {icon}
+              </span>
+              <span>{label}</span>
             </NavLink>
           ))}
         </nav>
 
         <div className="sidebar-footer">
           <button className="btn-logout" onClick={handleLogout}>
-            <span>🚪</span> Logout
+            <span>🚪</span>
+            <span>Logout</span>
           </button>
         </div>
       </aside>
@@ -64,12 +95,14 @@ const StudentDashboard = () => {
         <div className="dashboard-topbar">
           <NotificationBell />
         </div>
+
         <Routes>
-          <Route path="/" element={<StudentHome user={user} />} />
-          <Route path="profile"         element={<Profile />} />
-          <Route path="exams"           element={<Exams />} />
-          <Route path="results"         element={<Results />} />
-          <Route path="take-exam/:id"   element={<TakeExam />} />
+          <Route index element={<StudentHome user={user} />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="exams" element={<Exams />} />
+          <Route path="results" element={<Results />} />
+          <Route path="take-exam/:id" element={<TakeExam />} />
         </Routes>
       </main>
     </div>
@@ -78,21 +111,21 @@ const StudentDashboard = () => {
 
 const StudentHome = ({ user }) => (
   <div className="panel" style={{ animation: 'slideUp 0.4s ease' }}>
-    <div className="welcome-banner" style={{ '--after-emoji': '"📖"' }}>
-      <h2>Hello, {user?.name?.split(' ')[0] || 'Student'}! 👋</h2>
-      <p>Check your enrolled exams, view past results, and update your profile.</p>
+    <div className="welcome-banner">
+      <h2>Hello, {user?.name?.split(' ')[0] || 'Student'}!</h2>
+      <p>
+        Check your enrolled exams, view past results, and manage your account.
+      </p>
     </div>
+
     <div className="stat-cards">
-      {[
-        { icon: '📋', label: 'My Exams',   sub: 'View enrolled exams' },
-        { icon: '🏆', label: 'Results',    sub: 'See your scores' },
-        { icon: '👤', label: 'Profile',    sub: 'Manage your info' },
-        { icon: '🔒', label: 'Secure',     sub: 'Proctored environment' },
-      ].map(c => (
-        <div className="stat-card" key={c.label}>
-          <span className="stat-card-icon">{c.icon}</span>
-          <div className="stat-card-value" style={{ fontSize: '18px' }}>{c.label}</div>
-          <div className="stat-card-label">{c.sub}</div>
+      {cards.map(({ icon, label, sub }) => (
+        <div className="stat-card" key={label}>
+          <span className="stat-card-icon">{icon}</span>
+          <div className="stat-card-value" style={{ fontSize: '18px' }}>
+            {label}
+          </div>
+          <div className="stat-card-label">{sub}</div>
         </div>
       ))}
     </div>

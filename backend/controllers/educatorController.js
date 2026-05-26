@@ -5,7 +5,7 @@ const Result = require('../models/Result');
 
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -15,7 +15,11 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   const { name, department, profilePicture } = req.body;
   try {
-    const user = await User.findByIdAndUpdate(req.user.id, { name, department, profilePicture }, { new: true });
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { name, department, profilePicture },
+      { new: true }
+    ).select('-password');
     res.json(user);
   } catch (err) {
     res.status(500).json({ message: err.message });
