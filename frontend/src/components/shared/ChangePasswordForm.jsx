@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const initialForm = {
   currentPassword: '',
@@ -23,6 +23,13 @@ const ChangePasswordForm = ({ roleLabel }) => {
     setMessage('');
     setError('');
 
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      setError('Your session has expired. Please log in again and then change your password.');
+      return;
+    }
+
     if (form.newPassword !== form.confirmPassword) {
       setError('New password and confirm password do not match.');
       return;
@@ -30,11 +37,19 @@ const ChangePasswordForm = ({ roleLabel }) => {
 
     setSaving(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/change-password', form);
+      const res = await api.post('/auth/change-password', form, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setMessage(res.data.message || 'Password changed successfully.');
       setForm(initialForm);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to change password.');
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setError('Your session is invalid or expired. Please log in again, then try changing your password.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to change password.');
+      }
     } finally {
       setSaving(false);
     }

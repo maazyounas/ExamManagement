@@ -1,5 +1,5 @@
-import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import { createContext, useState, useContext } from 'react';
+import api from './lib/api.js';
 
 const AuthContext = createContext();
 
@@ -21,31 +21,20 @@ export const AuthProvider = ({ children }) => {
 
   const [token, setToken] = useState(() => {
     const storedToken = localStorage.getItem('token');
-    // Set axios header synchronously during init (inside lazy initializer)
-    if (storedToken) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-    }
     return storedToken;
   });
 
-  useEffect(() => {
-    if (!token) {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
-
   const login = async (email, password) => {
-    const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+    const res = await api.post('/auth/login', { email, password });
     setToken(res.data.token);
     setUser(res.data.user);
     localStorage.setItem('token', res.data.token);
     localStorage.setItem('user', JSON.stringify(res.data.user));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
     return res.data.user;
   };
 
   const register = async (data) => {
-    await axios.post('http://localhost:5000/api/auth/register', data);
+    await api.post('/auth/register', data);
   };
 
   const logout = () => {
@@ -53,7 +42,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
   };
 
   return (
