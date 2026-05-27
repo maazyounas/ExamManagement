@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const getInitials = (name = '') =>
   name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -15,8 +15,9 @@ const Profile = () => {
     const fetchProfile = async () => {
       setLoading(true);
       try {
-        const res = await axios.get('http://localhost:5000/api/educators/profile');
-        setProfile(res.data); setForm(res.data);
+        const res = await api.get('/educators/profile');
+        setProfile(res.data);
+        setForm(res.data);
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };
@@ -28,8 +29,10 @@ const Profile = () => {
   const handleUpdate = async e => {
     e.preventDefault(); setSaving(true);
     try {
-      const res = await axios.put('http://localhost:5000/api/educators/profile', form);
-      setProfile(res.data); setEdit(false);
+      const res = await api.put('/educators/profile', form);
+      setProfile(res.data);
+      setForm(res.data);
+      setEdit(false);
     } catch (err) { alert('Failed to update profile'); }
     finally { setSaving(false); }
   };
