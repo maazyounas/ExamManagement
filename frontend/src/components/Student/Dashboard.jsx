@@ -129,6 +129,30 @@ const StudentHome = ({ user }) => (
         </div>
       ))}
     </div>
+    {/* Static Information Section */}
+
+<div className="student-home-extra">
+  <div className="extra-card">
+    <h3>🎓 Student Guidelines</h3>
+
+    <ul>
+      <li>Arrive 15 minutes before exam time.</li>
+      <li>Keep your webcam enabled during exams.</li>
+      <li>Do not refresh the browser during a test.</li>
+      <li>Any suspicious activity may terminate the exam.</li>
+    </ul>
+  </div>
+
+  <div className="extra-card">
+    <h3>💡 Quick Tips</h3>
+
+    <ul>
+      <li>Read every question carefully.</li>
+      <li>Manage your time efficiently.</li>
+      <li>Review answers before submission.</li>
+    </ul>
+  </div>
+</div>
   </div>
 );
 
