@@ -114,6 +114,7 @@ const EducatorHome = ({ user }) => (
       <h2>
         Welcome back, {user?.name?.split(' ')[0] || 'Educator'}!
       </h2>
+
       <p>
         Manage your exams, monitor students, and review performance reports.
       </p>
@@ -123,22 +124,75 @@ const EducatorHome = ({ user }) => (
       {cards.map(({ icon, label, sub }) => (
         <div className="stat-card" key={label}>
           <span className="stat-card-icon">{icon}</span>
-          <div className="stat-card-value" style={{ fontSize: '20px' }}>
+
+          <div
+            className="stat-card-value"
+            style={{ fontSize: '20px' }}
+          >
             {label}
           </div>
-          <div className="stat-card-label">{sub}</div>
+
+          <div className="stat-card-label">
+            {sub}
+          </div>
         </div>
       ))}
     </div>
 
-    <div className="panel-form">
-      <h4>Getting Started</h4>
-      <ol style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', lineHeight: '2', fontSize: '14px' }}>
-        <li>Go to <strong>Question Bank</strong> to add MCQ questions.</li>
-        <li>Go to <strong>Exams</strong> to create an exam group and assign questions.</li>
-        <li>Share the Exam Code with your students so they can join.</li>
-        <li>Use <strong>Monitoring</strong> to track student behaviour in real time.</li>
-        <li>Check <strong>Reports</strong> after the exam for detailed results.</li>
+    {/* NEW EDUCATOR CONTENT */}
+
+    <div className="educator-home-grid">
+      {/* Guidelines */}
+      <div className="extra-card">
+        <h3>📘 Educator Guidelines</h3>
+
+        <ul>
+          <li>Create exams with clear instructions.</li>
+          <li>Verify all questions before publishing.</li>
+          <li>Monitor suspicious student activity.</li>
+          <li>Review reports after each examination.</li>
+        </ul>
+      </div>
+
+
+      {/* Tips */}
+      <div className="extra-card">
+        <h3>💡 Teaching Tips</h3>
+
+        <ul>
+          <li>Keep exam difficulty balanced.</li>
+          <li>Use randomized questions for fairness.</li>
+          <li>Set appropriate exam durations.</li>
+          <li>Provide feedback after evaluation.</li>
+        </ul>
+      </div>
+    </div>
+
+    {/* Getting Started */}
+
+    <div className="panel-form educator-guide">
+      <h4>🚀 Getting Started</h4>
+
+      <ol>
+        <li>
+          Go to <strong>Question Bank</strong> to add MCQ questions.
+        </li>
+
+        <li>
+          Go to <strong>Exams</strong> to create exams and assign questions.
+        </li>
+
+        <li>
+          Share the Exam Code with students to join the exam.
+        </li>
+
+        <li>
+          Use <strong>Monitoring</strong> for live student tracking.
+        </li>
+
+        <li>
+          Review detailed analytics in <strong>Reports</strong>.
+        </li>
       </ol>
     </div>
   </div>
