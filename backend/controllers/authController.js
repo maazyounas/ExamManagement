@@ -4,7 +4,27 @@ const jwt = require('jsonwebtoken');
 exports.register = async (req, res) => {
   const { name, email, password, role, studentId, course, department } = req.body;
   try {
-    const user = new User({ name, email, password, role, studentId, course, department });
+    const normalizedRole = role === 'educator' ? 'educator' : 'student';
+    const normalizedStudentId = normalizedRole === 'student' && typeof studentId === 'string'
+      ? studentId.trim()
+      : undefined;
+    const normalizedCourse = normalizedRole === 'student' && typeof course === 'string'
+      ? course.trim()
+      : undefined;
+    const normalizedDepartment = normalizedRole === 'educator' && typeof department === 'string'
+      ? department.trim()
+      : undefined;
+
+    const user = new User({
+      name,
+      email,
+      password,
+      role: normalizedRole,
+      studentId: normalizedStudentId || undefined,
+      course: normalizedCourse || undefined,
+      department: normalizedDepartment || undefined,
+    });
+
     await user.save();
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {

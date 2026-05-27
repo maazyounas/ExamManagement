@@ -9,12 +9,40 @@ const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((prev) => {
+      if (name === 'role') {
+        return value === 'student'
+          ? { ...prev, role: value, department: '' }
+          : { ...prev, role: value, studentId: '', course: '' };
+      }
+
+      return { ...prev, [name]: value };
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      await register(form);
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+      };
+
+      if (form.role === 'student') {
+        payload.studentId = form.studentId.trim();
+        if (form.course.trim()) payload.course = form.course.trim();
+      }
+
+      if (form.role === 'educator' && form.department.trim()) {
+        payload.department = form.department.trim();
+      }
+
+      await register(payload);
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
