@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 import EditExamModal from './EditExamModal.jsx';
 
 const getExamStatus = (scheduledDate) => {
@@ -32,8 +32,8 @@ const Exams = () => {
     setLoading(true);
     try {
       const [e, q] = await Promise.all([
-        axios.get('http://localhost:5000/api/educators/exams'),
-        axios.get('http://localhost:5000/api/educators/questions'),
+        api.get('/educators/exams'),
+        api.get('/educators/questions'),
       ]);
       setExams(e.data); setQuestions(q.data);
     } catch (err) { console.error(err); }
@@ -70,11 +70,11 @@ const Exams = () => {
     if (!questionForm.questionText || !questionForm.correctAnswer) return alert('Question text and correct answer required.');
     setQuestionLoading(true);
     try {
-      if (editQuestionId) await axios.put(`http://localhost:5000/api/educators/questions/${editQuestionId}`, questionForm);
-      else                await axios.post('http://localhost:5000/api/educators/questions', questionForm);
+      if (editQuestionId) await api.put(`/educators/questions/${editQuestionId}`, questionForm);
+      else                await api.post('/educators/questions', questionForm);
       setQuestionForm({ questionText:'', subject:'', topic:'', difficulty:'medium', options:['','','',''], correctAnswer:'' });
       setEditQuestionId(null); await refreshData();
-    } catch (err) { alert('Failed to save question'); }
+    } catch (err) { alert(err.response?.data?.message || 'Failed to save question'); }
     finally { setQuestionLoading(false); }
   };
 
@@ -86,7 +86,7 @@ const Exams = () => {
   const deleteQuestion = async id => {
     if (!window.confirm('Delete this question?')) return;
     setQuestionLoading(true);
-    try { await axios.delete(`http://localhost:5000/api/educators/questions/${id}`); await refreshData(); }
+    try { await api.delete(`/educators/questions/${id}`); await refreshData(); }
     catch (err) { alert('Failed to delete'); }
     finally { setQuestionLoading(false); }
   };
@@ -97,7 +97,7 @@ const Exams = () => {
       return alert('Complete variant details and select at least one question.');
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/educators/exams', { ...variantForm, ...group });
+      const res = await api.post('/educators/exams', { ...variantForm, ...group });
       setLastSavedVariant(res.data); setVariantCount(c => c + 1); resetVariantForm(); await refreshData();
     } catch (err) { alert(err.response?.data?.message || 'Failed to create exam variant'); }
     finally { setLoading(false); }
@@ -105,7 +105,7 @@ const Exams = () => {
 
   const handleDeleteExam = async id => {
     setLoading(true);
-    try { await axios.delete(`http://localhost:5000/api/educators/exams/${id}`); setDeleteConfirm(null); await refreshData(); }
+    try { await api.delete(`/educators/exams/${id}`); setDeleteConfirm(null); await refreshData(); }
     catch (err) { alert('Failed to delete exam'); }
     finally { setLoading(false); }
   };

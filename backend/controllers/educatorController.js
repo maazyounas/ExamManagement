@@ -66,7 +66,9 @@ exports.getQuestions = async (req, res) => {
 exports.createExam = async (req, res) => {
   const { title, description, questions, scheduledDate, duration, assignedCourses, assignedDepartments, rules, groupId, groupName, groupDescription, subject, randomAssign, assignCount } = req.body;
   try {
-    if (!groupId) {
+    const normalizedGroupId = typeof groupId === 'string' ? groupId.trim().toUpperCase() : '';
+
+    if (!normalizedGroupId) {
       return res.status(400).json({ message: 'Exam Group ID is required.' });
     }
 
@@ -76,7 +78,7 @@ exports.createExam = async (req, res) => {
 
     const exam = new Exam({
       title,
-      groupId,
+      groupId: normalizedGroupId,
       groupName,
       groupDescription,
       subject,
@@ -122,7 +124,8 @@ exports.createExamGroup = async (req, res) => {
       return res.status(400).json({ message: 'Please add at least one exam variant in the group.' });
     }
 
-    const group = groupId || `GRP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const normalizedGroupId = typeof groupId === 'string' ? groupId.trim().toUpperCase() : '';
+    const group = normalizedGroupId || `GRP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const createdExams = [];
 
     for (const examData of exams) {

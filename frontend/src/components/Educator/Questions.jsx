@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const DIFF_COLORS = {
   easy:   { bg: 'var(--success-light)', color: 'var(--success)' },
@@ -25,7 +25,7 @@ const Questions = () => {
   const refreshQuestions = async () => {
     setListLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/educators/questions');
+      const res = await api.get('/educators/questions');
       setQuestions(res.data);
     } catch (err) {
       console.error(err);
@@ -53,7 +53,6 @@ const Questions = () => {
   };
 
   const openForm = () => {
-    resetForm();
     setShowForm(true);
   };
 
@@ -66,8 +65,8 @@ const Questions = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      if (editId) await axios.put(`http://localhost:5000/api/educators/questions/${editId}`, form);
-      else await axios.post('http://localhost:5000/api/educators/questions', form);
+      if (editId) await api.put(`/educators/questions/${editId}`, form);
+      else await api.post('/educators/questions', form);
       closeForm();
       await refreshQuestions();
     } catch (err) {
@@ -91,7 +90,7 @@ const Questions = () => {
     if (!window.confirm('Delete this question from the bank?')) return;
     setDeletingId(id);
     try {
-      await axios.delete(`http://localhost:5000/api/educators/questions/${id}`);
+      await api.delete(`/educators/questions/${id}`);
       await refreshQuestions();
     } catch (err) {
       const msg = err.response?.data?.message

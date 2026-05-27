@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 import FeedbackModal from './FeedbackModal.jsx';
 import IssueModal from './IssueModal.jsx';
 
@@ -30,7 +30,7 @@ const Results = () => {
     const fetchResults = async () => {
       setLoading(true);
       try {
-        const res = await axios.get('http://localhost:5000/api/students/results');
+        const res = await api.get('/students/results');
         setResults(res.data);
       } catch (err) { console.error('Failed to fetch results:', err); }
       finally { setLoading(false); }

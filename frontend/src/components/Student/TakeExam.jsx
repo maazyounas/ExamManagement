@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../lib/api.js';
 import ExamMonitor from './ExamMonitor.jsx';
 
 const TakeExam = () => {
@@ -53,7 +53,7 @@ const TakeExam = () => {
 
   const fetchExam = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/students/exam/${id}`);
+      const res = await api.get(`/students/exam/${id}`);
       setExam(res.data);
       setTimeLeft(res.data.duration * 60); // minutes to seconds
       // Initialize answers
@@ -84,7 +84,7 @@ const TakeExam = () => {
     if (submitting || submitted) return; // Prevent multiple submissions
     setSubmitting(true);
     try {
-      await axios.post(`http://localhost:5000/api/students/submit/${id}`, { 
+      await api.post(`/students/submit/${id}`, {
         answers, 
         timeTracker 
       });

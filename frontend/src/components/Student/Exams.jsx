@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const getCountdown = (scheduledDate) => {
   const diff = new Date(scheduledDate) - new Date();
@@ -28,7 +28,7 @@ const Exams = () => {
   const fetchExams = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/students/exams');
+      const res = await api.get('/students/exams');
       setExams(res.data);
     } catch (err) { console.error('Failed to fetch exams:', err); }
     finally { setLoading(false); }
@@ -37,7 +37,7 @@ const Exams = () => {
   const handleJoin = async (e) => {
     e.preventDefault(); setJoining(true);
     try {
-      await axios.post('http://localhost:5000/api/students/join', { examCode });
+      await api.post('/students/join', { examCode: examCode.trim() });
       setExamCode('');
       await fetchExams();
     } catch (err) {

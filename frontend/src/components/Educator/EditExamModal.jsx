@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const EditExamModal = ({ exam, questions = [], onClose, onRefresh }) => {
   const [form, setForm] = useState({
@@ -51,12 +51,10 @@ const EditExamModal = ({ exam, questions = [], onClose, onRefresh }) => {
     }
 
     try {
-      await axios.put(`http://localhost:5000/api/educators/exams/${exam._id}`, {
+      await api.put(`/educators/exams/${exam._id}`, {
         ...exam, 
         ...form,
         questions: selectedQuestions
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       onRefresh();
       onClose();

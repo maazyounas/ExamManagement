@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const generateGroupId = () => `GRP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
@@ -35,11 +35,11 @@ const ExamBuilder = () => {
   const refreshQuestions = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/educators/questions');
+      const res = await api.get('/educators/questions');
       setQuestions(res.data);
     } catch (err) {
       console.error('Failed to fetch questions:', err);
-      alert('Failed to load questions');
+      alert(err.response?.data?.message || 'Failed to load questions');
     } finally {
       setLoading(false);
     }
@@ -66,9 +66,9 @@ const ExamBuilder = () => {
     setQuestionLoading(true);
     try {
       if (editQuestionId) {
-        await axios.put(`http://localhost:5000/api/educators/questions/${editQuestionId}`, questionForm);
+        await api.put(`/educators/questions/${editQuestionId}`, questionForm);
       } else {
-        await axios.post('http://localhost:5000/api/educators/questions', questionForm);
+        await api.post('/educators/questions', questionForm);
       }
       setQuestionForm({
         questionText: '',
@@ -82,7 +82,7 @@ const ExamBuilder = () => {
       await refreshQuestions();
     } catch (err) {
       console.error('Failed to save question:', err);
-      alert('Failed to save question');
+      alert(err.response?.data?.message || 'Failed to save question');
     } finally {
       setQuestionLoading(false);
     }
@@ -104,11 +104,11 @@ const ExamBuilder = () => {
     if (!window.confirm('Delete this question?')) return;
     setQuestionLoading(true);
     try {
-      await axios.delete(`http://localhost:5000/api/educators/questions/${id}`);
+      await api.delete(`/educators/questions/${id}`);
       await refreshQuestions();
     } catch (err) {
       console.error('Failed to delete question:', err);
-      alert('Failed to delete question');
+      alert(err.response?.data?.message || 'Failed to delete question');
     } finally {
       setQuestionLoading(false);
     }
@@ -152,7 +152,7 @@ const ExamBuilder = () => {
 
     setLoading(true);
     try {
-      await axios.post('http://localhost:5000/api/educators/exams/group', {
+      await api.post('/educators/exams/group', {
         groupId,
         groupName,
         groupDescription,

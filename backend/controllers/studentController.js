@@ -44,7 +44,11 @@ exports.getEnrolledExams = async (req, res) => {
 exports.joinExam = async (req, res) => {
   const { examCode } = req.body;
   try {
-    const groupId = examCode;
+    const groupId = typeof examCode === 'string' ? examCode.trim().toUpperCase() : '';
+    if (!groupId) {
+      return res.status(400).json({ message: 'Group ID is required' });
+    }
+
     const existingAssigned = await Exam.findOne({ groupId, enrolledStudents: toObjectId(req.user.id) });
     if (existingAssigned) {
       return res.json(existingAssigned);
