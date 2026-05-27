@@ -49,9 +49,9 @@ const EducatorDashboard = () => {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="sidebar-brand-icon">EX</div>
-            <span className="sidebar-brand-name">Examsphere</span>
-          </div>
+  <div className="sidebar-brand-icon">🎓</div>
+  <span className="sidebar-brand-name">Examsphere</span>
+</div>
 
           <div className="sidebar-user">
             <div className="sidebar-avatar">

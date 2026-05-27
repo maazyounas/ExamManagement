@@ -1,34 +1,34 @@
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../AuthContext.jsx';
+import { Routes, Route, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../AuthContext.jsx";
 
-import Profile from './Profile.jsx';
-import Settings from './Settings.jsx';
-import Exams from './Exams.jsx';
-import Results from './Results.jsx';
-import TakeExam from './TakeExam.jsx';
-import NotificationBell from './NotificationBell.jsx';
+import Profile from "./Profile.jsx";
+import Settings from "./Settings.jsx";
+import Exams from "./Exams.jsx";
+import Results from "./Results.jsx";
+import TakeExam from "./TakeExam.jsx";
+import NotificationBell from "./NotificationBell.jsx";
 
 const NAV = [
-  { to: '/student', icon: '🏠', label: 'Dashboard' },
-  { to: '/student/exams', icon: '📝', label: 'My Exams' },
-  { to: '/student/results', icon: '🏆', label: 'Results' },
-  { to: '/student/profile', icon: '👤', label: 'Profile' },
-  { to: '/student/settings', icon: '⚙️', label: 'Settings' },
+  { to: "/student", icon: "🏠", label: "Dashboard" },
+  { to: "/student/exams", icon: "📝", label: "My Exams" },
+  { to: "/student/results", icon: "🏆", label: "Results" },
+  { to: "/student/profile", icon: "👤", label: "Profile" },
+  { to: "/student/settings", icon: "⚙️", label: "Settings" },
 ];
 
 const cards = [
-  { icon: '📚', label: 'My Exams', sub: 'View enrolled exams' },
-  { icon: '📊', label: 'Results', sub: 'See your scores' },
-  { icon: '👤', label: 'Profile', sub: 'Manage your info' },
-  { icon: '🔐', label: 'Settings', sub: 'Change password' },
-  { icon: '🛡️', label: 'Secure', sub: 'Proctored environment' },
+  { icon: "📚", label: "My Exams", sub: "View enrolled exams" },
+  { icon: "📊", label: "Results", sub: "See your scores" },
+  { icon: "👤", label: "Profile", sub: "Manage your info" },
+  { icon: "🔐", label: "Settings", sub: "Change password" },
+  { icon: "🛡️", label: "Secure", sub: "Proctored environment" },
 ];
 
-const getInitials = (name = '') =>
+const getInitials = (name = "") =>
   name
-    .split(' ')
+    .split(" ")
     .map((w) => w[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .slice(0, 2);
 
@@ -38,7 +38,7 @@ const StudentDashboard = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -46,19 +46,15 @@ const StudentDashboard = () => {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="sidebar-brand-icon">EX</div>
+            <div className="sidebar-brand-icon">🎓</div>
             <span className="sidebar-brand-name">Examsphere</span>
           </div>
 
           <div className="sidebar-user">
-            <div className="sidebar-avatar">
-              {getInitials(user?.name)}
-            </div>
+            <div className="sidebar-avatar">{getInitials(user?.name)}</div>
 
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">
-                {user?.name || 'Student'}
-              </div>
+              <div className="sidebar-user-name">{user?.name || "Student"}</div>
               <div className="sidebar-user-role">Student</div>
             </div>
           </div>
@@ -71,13 +67,12 @@ const StudentDashboard = () => {
             <NavLink
               key={to}
               to={to}
+              end={to === "/student"}
               className={({ isActive }) =>
-                `sidebar-link${isActive ? ' active' : ''}`
+                `sidebar-link${isActive ? " active" : ""}`
               }
             >
-              <span className="sidebar-link-icon">
-                {icon}
-              </span>
+              <span className="sidebar-link-icon">{icon}</span>
               <span>{label}</span>
             </NavLink>
           ))}
@@ -110,9 +105,9 @@ const StudentDashboard = () => {
 };
 
 const StudentHome = ({ user }) => (
-  <div className="panel" style={{ animation: 'slideUp 0.4s ease' }}>
+  <div className="panel" style={{ animation: "slideUp 0.4s ease" }}>
     <div className="welcome-banner">
-      <h2>Hello, {user?.name?.split(' ')[0] || 'Student'}!</h2>
+      <h2>Hello, {user?.name?.split(" ")[0] || "Student"}!</h2>
       <p>
         Check your enrolled exams, view past results, and manage your account.
       </p>
@@ -122,7 +117,7 @@ const StudentHome = ({ user }) => (
       {cards.map(({ icon, label, sub }) => (
         <div className="stat-card" key={label}>
           <span className="stat-card-icon">{icon}</span>
-          <div className="stat-card-value" style={{ fontSize: '18px' }}>
+          <div className="stat-card-value" style={{ fontSize: "18px" }}>
             {label}
           </div>
           <div className="stat-card-label">{sub}</div>
@@ -131,28 +126,28 @@ const StudentHome = ({ user }) => (
     </div>
     {/* Static Information Section */}
 
-<div className="student-home-extra">
-  <div className="extra-card">
-    <h3>🎓 Student Guidelines</h3>
+    <div className="student-home-extra">
+      <div className="extra-card">
+        <h3>🎓 Student Guidelines</h3>
 
-    <ul>
-      <li>Arrive 15 minutes before exam time.</li>
-      <li>Keep your webcam enabled during exams.</li>
-      <li>Do not refresh the browser during a test.</li>
-      <li>Any suspicious activity may terminate the exam.</li>
-    </ul>
-  </div>
+        <ul>
+          <li>Arrive 15 minutes before exam time.</li>
+          <li>Keep your webcam enabled during exams.</li>
+          <li>Do not refresh the browser during a test.</li>
+          <li>Any suspicious activity may terminate the exam.</li>
+        </ul>
+      </div>
 
-  <div className="extra-card">
-    <h3>💡 Quick Tips</h3>
+      <div className="extra-card">
+        <h3>💡 Quick Tips</h3>
 
-    <ul>
-      <li>Read every question carefully.</li>
-      <li>Manage your time efficiently.</li>
-      <li>Review answers before submission.</li>
-    </ul>
-  </div>
-</div>
+        <ul>
+          <li>Read every question carefully.</li>
+          <li>Manage your time efficiently.</li>
+          <li>Review answers before submission.</li>
+        </ul>
+      </div>
+    </div>
   </div>
 );
 
