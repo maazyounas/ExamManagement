@@ -21,11 +21,15 @@ const NAV = [
 ];
 
 const cards = [
-  { icon: 'Create', label: 'Quick Start', sub: 'Create an exam' },
-  { icon: 'Bank', label: 'Question Bank', sub: 'Add questions' },
-  { icon: 'Live', label: 'Monitoring', sub: 'Live proctoring' },
-  { icon: 'Reports', label: 'Reports', sub: 'View results' },
-  { icon: 'Security', label: 'Settings', sub: 'Change password' },
+  { icon: '📝', label: 'Quick Start', sub: 'Create an exam' },
+
+  { icon: '📚', label: 'Question Bank', sub: 'Add questions' },
+
+  { icon: '📡', label: 'Monitoring', sub: 'Live proctoring' },
+
+  { icon: '📊', label: 'Reports', sub: 'View results' },
+
+  { icon: '⚙️', label: 'Settings', sub: 'Change password' },
 ];
 
 const getInitials = (name = '') =>
@@ -127,7 +131,7 @@ const EducatorHome = ({ user }) => (
 
           <div
             className="stat-card-value"
-            style={{ fontSize: '20px' }}
+            style={{ fontSize: '18px' }}
           >
             {label}
           </div>
