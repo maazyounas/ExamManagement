@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../lib/api.js';
 
@@ -12,6 +12,8 @@ const getCountdown = (scheduledDate) => {
   return `Starts in ${m}m`;
 };
 
+
+
 const Exams = () => {
   const [exams, setExams] = useState([]);
   const [examCode, setExamCode] = useState('');
@@ -19,20 +21,23 @@ const Exams = () => {
   const [joining, setJoining] = useState(false);
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    fetchExams();
-    const interval = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchExams = async () => {
+  const fetchExams = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/students/exams');
       setExams(res.data);
-    } catch (err) { console.error('Failed to fetch exams:', err); }
-    finally { setLoading(false); }
-  };
+    } catch (err) {
+      console.error('Failed to fetch exams:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExams();
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, [fetchExams]);
 
   const handleJoin = async (e) => {
     e.preventDefault(); setJoining(true);

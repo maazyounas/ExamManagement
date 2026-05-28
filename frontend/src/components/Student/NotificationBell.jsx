@@ -1,10 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/notifications/student', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setNotifications(res.data);
+    } catch (err) {
+      console.error('Failed to fetch student notifications', err);
+    }
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
@@ -16,18 +27,7 @@ const NotificationBell = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const fetchNotifications = async () => {
-    try {
-      const res = await axios.get('http://localhost:5000/api/notifications/student', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setNotifications(res.data);
-    } catch (err) {
-      console.error('Failed to fetch student notifications', err);
-    }
-  };
+  }, [fetchNotifications]);
 
   const markAsRead = async (id, isReadLocally) => {
     if (isReadLocally) return;

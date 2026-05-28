@@ -34,8 +34,7 @@ const refreshQuestions = useCallback(async () => {
   }
 }, []);
 
-// eslint-disable-next-line react-hooks/exhaustive-deps,react-hooks/set-state-in-effect
-useEffect(() => { refreshQuestions(); }, []);
+  useEffect(() => { refreshQuestions(); }, [refreshQuestions]);
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target;

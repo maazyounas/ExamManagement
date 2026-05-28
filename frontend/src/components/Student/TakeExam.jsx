@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
 import ExamMonitor from './ExamMonitor.jsx';
@@ -29,7 +29,7 @@ const TakeExam = () => {
 
   useEffect(() => {
     fetchExam();
-  }, [id]);
+  }, [fetchExam]);
 
   // Countdown timer
   useEffect(() => {
@@ -61,7 +61,7 @@ const TakeExam = () => {
     }
   }, [exam, currentQuestion, submitting, examStarted]);
 
-  const fetchExam = async () => {
+  const fetchExam = useCallback(async () => {
     try {
       const res = await api.get(`/students/exam/${id}`);
       setExam(res.data);
@@ -75,7 +75,7 @@ const TakeExam = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   const requestPermissions = async () => {
     setVerifyingPermissions(true);
