@@ -16,7 +16,9 @@ const {
   getStudentPerformance,
   generateReport,
   getStudents,
-  recollectExam
+  recollectExam,
+  getPasswordResets,
+  approvePasswordReset
 } = require('../controllers/educatorController');
 
 router.use(auth);
@@ -37,5 +39,7 @@ router.get('/exams', getExams);
 router.get('/performance', getStudentPerformance);
 router.get('/reports', generateReport);
 router.delete('/exams/:examId/recollect/:studentId', recollectExam);
+router.get('/password-resets', getPasswordResets);
+router.post('/password-resets/:id/reset', approvePasswordReset);
 
 module.exports = router;

@@ -9,6 +9,7 @@ import Reports from "./Reports.jsx";
 import Monitoring from "./Monitoring.jsx";
 import Notifications from "./Notifications.jsx";
 import FeedbackIssues from "./FeedbackIssues.jsx";
+import PasswordResets from "./PasswordResets.jsx";
 
 const NAV = [
   { to: "/educator", icon: "🏠", label: "Dashboard" },
@@ -18,6 +19,7 @@ const NAV = [
   { to: "/educator/reports", icon: "📊", label: "Reports" },
   { to: "/educator/feedback-issues", icon: "💬", label: "Feedback & Issues" },
   { to: "/educator/notifications", icon: "🔔", label: "Notifications" },
+  { to: "/educator/password-resets", icon: "🔐", label: "Password Resets" },
   { to: "/educator/profile", icon: "👤", label: "Profile" },
   { to: "/educator/settings", icon: "⚙️", label: "Settings" },
 ];
@@ -109,6 +111,7 @@ const EducatorDashboard = () => {
           <Route path="reports" element={<Reports />} />
           <Route path="feedback-issues" element={<FeedbackIssues />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="password-resets" element={<PasswordResets />} />
         </Routes>
       </main>
     </div>

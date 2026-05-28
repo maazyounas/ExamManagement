@@ -3,6 +3,7 @@ const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const Result = require('../models/Result');
 const MonitoringSession = require('../models/MonitoringSession');
+const PasswordResetRequest = require('../models/PasswordResetRequest');
 
 exports.getProfile = async (req, res) => {
   try {
@@ -409,6 +410,42 @@ exports.getStudents = async (req, res) => {
     res.json(students);
   } catch (err) {
     console.error('getStudents error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getPasswordResets = async (req, res) => {
+  try {
+    const requests = await PasswordResetRequest.find({ status: 'pending' }).populate('studentId', 'name studentId email');
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.approvePasswordReset = async (req, res) => {
+  try {
+    const resetReq = await PasswordResetRequest.findById(req.params.id);
+    if (!resetReq) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    if (resetReq.status === 'resolved') {
+      return res.status(400).json({ message: 'Request already resolved' });
+    }
+
+    const user = await User.findById(resetReq.studentId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.password = 'password';
+    await user.save(); // pre('save') hook will hash this
+
+    resetReq.status = 'resolved';
+    await resetReq.save();
+
+    res.json({ message: 'Password reset to "password" successfully.' });
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
