@@ -4,7 +4,8 @@ const {
   createNotification, 
   getSentNotifications, 
   getStudentNotifications, 
-  markAsRead 
+  markAsRead,
+  deleteNotification
 } = require('../controllers/notificationController');
 
 const router = express.Router();
@@ -12,6 +13,7 @@ const router = express.Router();
 // Educator routes
 router.post('/', auth, roleAuth(['educator']), createNotification);
 router.get('/sent', auth, roleAuth(['educator']), getSentNotifications);
+router.delete('/:id', auth, roleAuth(['educator']), deleteNotification);
 
 // Student routes
 router.get('/student', auth, roleAuth(['student']), getStudentNotifications);

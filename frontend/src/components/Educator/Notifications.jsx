@@ -74,6 +74,20 @@ const Notifications = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this notification? It will be removed for all students.')) return;
+    
+    try {
+      await axios.delete(`http://localhost:5000/api/notifications/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setSentNotifications(prev => prev.filter(n => n._id !== id));
+      setSuccess('Notification deleted successfully!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete notification');
+    }
+  };
+
   return (
     <div className="panel" style={{ animation: 'fadeIn 0.4s ease' }}>
       <div className="page-header">
@@ -216,10 +230,19 @@ const Notifications = () => {
                   borderLeft: '4px solid #0af'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong style={{ fontSize: '14px' }}>{notification.title}</strong>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {new Date(notification.createdAt).toLocaleDateString()}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <strong style={{ fontSize: '14px' }}>{notification.title}</strong>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {new Date(notification.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => handleDelete(notification._id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '16px', padding: '0 4px' }}
+                      title="Delete Notification"
+                    >
+                      🗑️
+                    </button>
                   </div>
                   <p style={{ fontSize: '13px', margin: '0 0 8px', color: 'var(--text-secondary)' }}>
                     {notification.message}

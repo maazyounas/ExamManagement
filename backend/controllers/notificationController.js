@@ -95,3 +95,27 @@ exports.markAsRead = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// @desc   Delete a notification (Educator)
+// @route  DELETE /api/notifications/:id
+// @access Private (Educator)
+exports.deleteNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const notification = await Notification.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    if (notification.senderId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to delete this notification' });
+    }
+
+    await notification.deleteOne();
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (err) {
+    console.error('Delete notification error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
