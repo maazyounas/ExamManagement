@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api.js';
 
 const DIFF_COLORS = {
@@ -20,21 +20,22 @@ const Questions = () => {
     options: ['', '', '', ''], correctAnswer: '', isReusable: true,
   });
 
-  useEffect(() => { refreshQuestions(); }, []);
+const refreshQuestions = useCallback(async () => {
+  setListLoading(true);
+  try {
+    const res = await api.get('/educators/questions');
+    setQuestions(res.data);
+  } catch (err) {
+    console.error(err);
+    const msg = err.response?.data?.message || 'Could not load questions. Is the backend running on port 5000?';
+    alert(msg);
+  } finally {
+    setListLoading(false);
+  }
+}, []);
 
-  const refreshQuestions = async () => {
-    setListLoading(true);
-    try {
-      const res = await api.get('/educators/questions');
-      setQuestions(res.data);
-    } catch (err) {
-      console.error(err);
-      const msg = err.response?.data?.message || 'Could not load questions. Is the backend running on port 5000?';
-      alert(msg);
-    } finally {
-      setListLoading(false);
-    }
-  };
+// eslint-disable-next-line react-hooks/exhaustive-deps,react-hooks/set-state-in-effect
+useEffect(() => { refreshQuestions(); }, []);
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target;
