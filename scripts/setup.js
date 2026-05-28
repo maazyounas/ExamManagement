@@ -51,4 +51,4 @@ if (fs.existsSync(modelDir)) {
 console.log('\nDone. Start with:');
 console.log('  Terminal 1: npm run dev:backend');
 console.log('  Terminal 2: npm run dev:frontend');
-console.log('\nMongoDB: optional Docker (docker compose up -d) or in-memory fallback on first backend start.\n');
+

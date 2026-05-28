@@ -23,7 +23,7 @@ npm run dev:frontend  # http://localhost:5173
 
 | Option | Command |
 |--------|---------|
-| **Docker MongoDB** (persistent) | `docker compose up -d` then `MONGO_URI=mongodb://127.0.0.1:27017/examdb` in `.env` |
+
 | **In-memory** (zero setup) | Leave defaults; backend auto-starts embedded Mongo if nothing else connects |
 
 Node.js 18+ recommended.
