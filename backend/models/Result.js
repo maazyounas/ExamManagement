@@ -8,6 +8,7 @@ const resultSchema = new mongoose.Schema({
   totalQuestions: { type: Number, required: true },
   percentage: { type: Number, required: true },
   submittedAt: { type: Date, default: Date.now },
+  cancelledDueToViolation: { type: Boolean, default: false },
 });
 
 module.exports = mongoose.model('Result', resultSchema);

@@ -1,439 +1,417 @@
-import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../../lib/api.js';
 import * as faceapi from '@vladmandic/face-api';
 import '../../theme/theme.css';
 
-const ExamMonitor = ({ examId, onViolation }) => {
-  const [violations, setViolations] = useState([]);
-  const [locationWarning, setLocationWarning] = useState(null);
-  const [tabSwitchWarning, setTabSwitchWarning] = useState(false);
-  const [windowBlurWarning, setWindowBlurWarning] = useState(false);
-  const [initialLocation, setInitialLocation] = useState(null);
-  const [monitoringActive, setMonitoringActive] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
-  const [faceDetected, setFaceDetected] = useState(true);
+const ExamMonitor = ({ examId, onViolation, active }) => {
+  // ─── UI state ────────────────────────────────────────────────────────────────
+  const [statusText, setStatusText]         = useState('Starting...');
+  const [cameraStatus, setCameraStatus]     = useState('loading'); // loading | ok | blocked
+  const [locationStatus, setLocationStatus] = useState('loading'); // loading | ok | denied
+  const [faceDetected, setFaceDetected]     = useState(true);
+  const [violations, setViolations]         = useState([]);
+  const [lastWarning, setLastWarning]       = useState('');
+  const [warningVisible, setWarningVisible] = useState(false);
+  const [shutDown, setShutDown]             = useState(false);
   const [faceModelsLoaded, setFaceModelsLoaded] = useState(false);
 
-  const tabSwitchCountRef = useRef(0);
-  const blurCountRef = useRef(0);
-  const faceAbsenceCountRef = useRef(0);
-  const watchIdRef = useRef(null);
-  const warningTimeoutRef = useRef(null);
-  const videoRef = useRef(null);
-  const isLoggingViolationRef = useRef(false);
+  // ─── Mutable refs (never trigger re-render) ──────────────────────────────────
+  const activeRef          = useRef(true);   // mirrors `active` prop without re-renders
+  const sessionStarted     = useRef(false);  // backend /monitoring/start called
+  const watchIdRef         = useRef(null);
+  const videoRef           = useRef(null);
+  const streamRef          = useRef(null);
+  const warningTimerRef    = useRef(null);
+  const faceIntervalRef    = useRef(null);
+  const initialLocationRef = useRef(null);
+  const violationLockRef   = useRef(false);  // per-violation 500ms debounce
+  const violationCountRef  = useRef(0);      // running total (no state re-render delay)
+  const faceGraceRef       = useRef(0);      // consecutive "no face" frames before logging
 
-  // Calculate distance between two coordinates using Haversine formula
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371000; // Earth radius in meters
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  // Start monitoring
+  // ─── Keep activeRef in sync with prop ────────────────────────────────────────
   useEffect(() => {
-    const startMonitoring = async () => {
+    activeRef.current = active;
+    if (active === false) {
+      doShutdown();
+    }
+  }, [active]);
+
+  // ─── Show a warning banner ────────────────────────────────────────────────────
+  const showWarning = useCallback((msg) => {
+    setLastWarning(msg);
+    setWarningVisible(true);
+    clearTimeout(warningTimerRef.current);
+    warningTimerRef.current = setTimeout(() => setWarningVisible(false), 4000);
+  }, []);
+
+  // ─── Log violation to backend + call parent ───────────────────────────────────
+  const logViolation = useCallback(async (endpoint, payload, type) => {
+    if (!activeRef.current || violationLockRef.current) return;
+    violationLockRef.current = true;
+    try {
+      const res = await api.post(endpoint, { examId, ...payload });
+      const total = res.data?.totalViolations ?? violationCountRef.current + 1;
+      violationCountRef.current = total;
+      setViolations(prev => [...prev, { type, ts: new Date() }]);
+      if (onViolation) onViolation(total, type);
+    } catch (err) {
+      console.error(`[ExamMonitor] Failed to log ${type}:`, err);
+    } finally {
+      setTimeout(() => { violationLockRef.current = false; }, 500);
+    }
+  }, [examId, onViolation]);
+
+  // ─── Shutdown — stop all resources ───────────────────────────────────────────
+  const doShutdown = useCallback(async () => {
+    activeRef.current = false;
+
+    // Stop geolocation
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    // Stop face detection interval
+    if (faceIntervalRef.current) {
+      clearInterval(faceIntervalRef.current);
+      faceIntervalRef.current = null;
+    }
+
+    // Stop camera
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    clearTimeout(warningTimerRef.current);
+
+    // Notify backend
+    try {
+      await api.post('/monitoring/end', { examId });
+    } catch (e) {
+      console.warn('[ExamMonitor] Could not call /monitoring/end:', e.message);
+    }
+
+    setShutDown(true);
+    setStatusText('Stopped');
+  }, [examId]);
+
+  // ─── Start everything ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (active === false) return;
+
+    // Reset shutdown flag so Strict Mode double-mount doesn't break us
+    activeRef.current  = true;
+    violationLockRef.current = false;
+    violationCountRef.current = 0;
+    faceGraceRef.current = 0;
+    sessionStarted.current = false;
+
+    let unmounted = false;
+
+    const init = async () => {
+      // 1. Start backend session
       try {
-        const activateSession = async (location = null) => {
-          try {
-            const res = await axios.post(
-              'http://localhost:5000/api/monitoring/start',
-              { examId, location },
-              { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-            );
-            setSessionId(res.data._id);
-          } catch (err) {
-            console.error('Failed to start monitoring session on backend:', err);
-          } finally {
-            // Always activate monitoring locally so camera starts
-            setMonitoringActive(true);
-          }
-        };
+        const locPos = await new Promise((res, rej) => {
+          if (!navigator.geolocation) { res(null); return; }
+          navigator.geolocation.getCurrentPosition(res, () => res(null), { timeout: 6000 });
+        });
+        if (unmounted) return;
 
-        // Get initial location
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const location = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy
-              };
-              setInitialLocation(location);
-              await activateSession(location);
+        const location = locPos ? {
+          latitude:  locPos.coords.latitude,
+          longitude: locPos.coords.longitude,
+          accuracy:  locPos.coords.accuracy,
+        } : null;
 
-              // Watch location changes
-              watchIdRef.current = navigator.geolocation.watchPosition(
-                (position) => {
-                  const currentLocation = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                  };
-
-                  const distance = calculateDistance(
-                    location.latitude,
-                    location.longitude,
-                    currentLocation.latitude,
-                    currentLocation.longitude
-                  );
-
-                  // Alert if moved more than 10 meters
-                  if (distance > 10) {
-                    logLocationViolation(currentLocation, distance);
-                  }
-                },
-                (error) => console.error('Geolocation error:', error),
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-              );
-            },
-            async (error) => {
-              console.error('Failed to get initial location:', error);
-              await activateSession(null);
-            },
-            { timeout: 5000 } // Timeout added here to prevent hanging!
-          );
+        if (location) {
+          initialLocationRef.current = location;
+          setLocationStatus('ok');
         } else {
-          await activateSession(null);
+          setLocationStatus('denied');
         }
+
+        if (!sessionStarted.current) {
+          await api.post('/monitoring/start', { examId, location });
+          sessionStarted.current = true;
+        }
+      } catch (e) {
+        console.warn('[ExamMonitor] session start error:', e.message);
+      }
+
+      if (!activeRef.current || unmounted) return;
+      setStatusText('Active');
+
+      // 2. Start geolocation watch (threshold 50m to avoid GPS jitter)
+      if (navigator.geolocation && initialLocationRef.current) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (pos) => {
+            if (!activeRef.current) return;
+            const init = initialLocationRef.current;
+            if (!init) return;
+            const dist = haversine(init.latitude, init.longitude, pos.coords.latitude, pos.coords.longitude);
+            if (dist > 50) {
+              showWarning(`⚠️ Location change detected — moved ${Math.round(dist)}m`);
+              logViolation('/monitoring/location-change', {
+                currentLocation: { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy },
+                distance: dist,
+              }, 'location_change');
+            }
+          },
+          (err) => console.warn('[ExamMonitor] geolocation watch error:', err.message),
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+      }
+
+      // 3. Load face model + start camera
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        if (!activeRef.current || unmounted) return;
+        setFaceModelsLoaded(true);
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        if (!activeRef.current || unmounted) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        setCameraStatus('ok');
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+
+        // 4. Start face detection loop (every 2 s)
+        faceIntervalRef.current = setInterval(async () => {
+          if (!activeRef.current || !videoRef.current) return;
+          const vid = videoRef.current;
+          if (vid.readyState < 2 || vid.paused || vid.videoWidth === 0) return;
+
+          const dets = await faceapi.detectAllFaces(vid, new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.4 }));
+          if (!activeRef.current) return;
+
+          if (dets.length === 0) {
+            faceGraceRef.current += 1;
+            setFaceDetected(false);
+            // Log only after 2 consecutive missed frames (4s) to avoid false positives
+            if (faceGraceRef.current === 2) {
+              showWarning('🚨 Face not detected — keep your face visible!');
+              logViolation('/monitoring/face-absence', {}, 'face_absence');
+            }
+          } else {
+            faceGraceRef.current = 0;
+            setFaceDetected(true);
+          }
+        }, 2000);
+
       } catch (err) {
-        console.error('Failed to start monitoring:', err);
-        setMonitoringActive(true); // Fallback
+        console.error('[ExamMonitor] Camera/FaceAPI error:', err);
+        setCameraStatus('blocked');
+        showWarning('⚠️ Camera blocked — face detection disabled');
       }
     };
 
-    startMonitoring();
+    init();
 
     return () => {
-      if (watchIdRef.current) {
+      unmounted = true;
+      // Don't call full doShutdown here (would notify backend prematurely in Strict Mode)
+      // Just clean up streams — backend session ends only when active=false prop arrives
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (faceIntervalRef.current) {
+        clearInterval(faceIntervalRef.current);
+        faceIntervalRef.current = null;
+      }
+      if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
-      // End backend session when student leaves the exam
-      axios.post(
-        'http://localhost:5000/api/monitoring/end',
-        { examId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      ).catch((err) => console.error('Failed to end monitoring on unmount:', err));
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId]);
 
-  // Tab switch detection
+  // ─── Tab switch detection (always on, ref-gated, no state dependency) ─────────
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handle = () => {
+      if (!activeRef.current) return;
       if (document.hidden) {
-        tabSwitchCountRef.current += 1;
-        setTabSwitchWarning(true);
-        logTabViolation();
-        clearTimeout(warningTimeoutRef.current);
-        warningTimeoutRef.current = setTimeout(() => setTabSwitchWarning(false), 3000);
+        showWarning('🚫 Tab switch detected — stay on the exam!');
+        logViolation('/monitoring/tab-switch', {}, 'tab_switch');
       }
     };
+    document.addEventListener('visibilitychange', handle);
+    return () => document.removeEventListener('visibilitychange', handle);
+  }, [logViolation, showWarning]);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [examId]);
-
-  // Window blur detection
+  // ─── Window blur detection ────────────────────────────────────────────────────
   useEffect(() => {
-    const handleWindowBlur = () => {
-      blurCountRef.current += 1;
-      setWindowBlurWarning(true);
-      logBlurViolation();
-      clearTimeout(warningTimeoutRef.current);
-      warningTimeoutRef.current = setTimeout(() => setWindowBlurWarning(false), 3000);
+    const handle = () => {
+      if (!activeRef.current) return;
+      showWarning('⚠️ Window focus lost — keep exam window active!');
+      logViolation('/monitoring/screen-blur', {}, 'screen_blur');
     };
+    window.addEventListener('blur', handle);
+    return () => window.removeEventListener('blur', handle);
+  }, [logViolation, showWarning]);
 
-    window.addEventListener('blur', handleWindowBlur);
-    return () => window.removeEventListener('blur', handleWindowBlur);
-  }, [examId]);
-
-  // Prevent copy-paste, right-click, etc.
+  // ─── Prevent right-click and copy-paste ──────────────────────────────────────
   useEffect(() => {
-    const handleContextMenu = (e) => e.preventDefault();
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v' || e.key === 'x')) {
+    const noContext = (e) => { if (activeRef.current) e.preventDefault(); };
+    const noKeys    = (e) => {
+      if (!activeRef.current) return;
+      if ((e.ctrlKey || e.metaKey) && ['c','v','x','a'].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
     };
-
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('contextmenu', noContext);
+    document.addEventListener('keydown', noKeys);
     return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('contextmenu', noContext);
+      document.removeEventListener('keydown', noKeys);
     };
   }, []);
 
-  // Log tab switch violation
-  const logTabViolation = async () => {
-    if (isLoggingViolationRef.current) return;
-    isLoggingViolationRef.current = true;
-    try {
-      const res = await axios.post(
-        'http://localhost:5000/api/monitoring/tab-switch',
-        { examId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setViolations(prev => [...prev, { type: 'tab_switch', timestamp: new Date() }]);
-      if (onViolation) onViolation(res.data.totalViolations, 'tab_switch');
-    } catch (err) {
-      console.error('Failed to log tab violation:', err);
-    } finally {
-      setTimeout(() => { isLoggingViolationRef.current = false; }, 1000);
-    }
-  };
+  // ─── Haversine distance (meters) ─────────────────────────────────────────────
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
 
-  // Log location change violation
-  const logLocationViolation = async (currentLocation, distance) => {
-    if (isLoggingViolationRef.current) return;
-    isLoggingViolationRef.current = true;
-    try {
-      const res = await axios.post(
-        'http://localhost:5000/api/monitoring/location-change',
-        { examId, currentLocation, distance },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setLocationWarning(`Moved ${distance.toFixed(0)}m from exam location`);
-      setViolations(prev => [...prev, { type: 'location_change', distance, timestamp: new Date() }]);
-      if (onViolation) onViolation(res.data.totalViolations, 'location_change');
-      clearTimeout(warningTimeoutRef.current);
-      warningTimeoutRef.current = setTimeout(() => setLocationWarning(null), 4000);
-    } catch (err) {
-      console.error('Failed to log location violation:', err);
-    } finally {
-      setTimeout(() => { isLoggingViolationRef.current = false; }, 1000);
-    }
-  };
+  // ─── Render: hide completely after shutdown ───────────────────────────────────
+  if (shutDown) return null;
 
-  // Log screen blur violation
-  const logBlurViolation = async () => {
-    if (isLoggingViolationRef.current) return;
-    isLoggingViolationRef.current = true;
-    try {
-      const res = await axios.post(
-        'http://localhost:5000/api/monitoring/screen-blur',
-        { examId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setViolations(prev => [...prev, { type: 'screen_blur', timestamp: new Date() }]);
-      if (onViolation) onViolation(res.data.totalViolations, 'screen_blur');
-    } catch (err) {
-      console.error('Failed to log blur violation:', err);
-    } finally {
-      setTimeout(() => { isLoggingViolationRef.current = false; }, 1000);
-    }
-  };
-
-  // Log face absence violation
-  const logFaceAbsenceViolation = async () => {
-    if (isLoggingViolationRef.current) return;
-    isLoggingViolationRef.current = true;
-    try {
-      const res = await axios.post(
-        'http://localhost:5000/api/monitoring/face-absence',
-        { examId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setViolations(prev => [...prev, { type: 'face_absence', timestamp: new Date() }]);
-      if (onViolation) onViolation(res.data.totalViolations, 'face_absence');
-    } catch (err) {
-      console.error('Failed to log face absence violation:', err);
-    } finally {
-      setTimeout(() => { isLoggingViolationRef.current = false; }, 1000);
-    }
-  };
-
-  // Stop monitoring
-  const stopMonitoring = async () => {
-    try {
-      if (watchIdRef.current) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-      await axios.post(
-        'http://localhost:5000/api/monitoring/end',
-        { examId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setMonitoringActive(false);
-    } catch (err) {
-      console.error('Failed to end monitoring:', err);
-    }
-  };
-
-  // Load models and start webcam
-  useEffect(() => {
-    const loadModelsAndStartWebcam = async () => {
-      try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-        setFaceModelsLoaded(true);
-
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error('Face API or webcam error:', err);
-      }
-    };
-
-    if (monitoringActive) {
-      loadModelsAndStartWebcam();
-    }
-
-    return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
-      }
-    };
-  }, [monitoringActive]);
-
-  // Face detection loop
-  useEffect(() => {
-    let intervalId;
-    if (monitoringActive && faceModelsLoaded && videoRef.current) {
-      intervalId = setInterval(async () => {
-        if (videoRef.current.readyState === 4) {
-          const detections = await faceapi.detectAllFaces(
-            videoRef.current,
-            new faceapi.TinyFaceDetectorOptions()
-          );
-
-          if (detections.length === 0) {
-            faceAbsenceCountRef.current += 1;
-            
-            // Trigger warning and violation after 1 consecutive interval (2 seconds)
-            if (faceAbsenceCountRef.current >= 1) {
-              setFaceDetected(false);
-              // Log violation immediately on the 1st interval
-              if (faceAbsenceCountRef.current === 1) {
-                logFaceAbsenceViolation();
-              }
-            }
-          } else {
-            faceAbsenceCountRef.current = 0;
-            setFaceDetected(true);
-          }
-        }
-      }, 2000);
-    }
-    return () => clearInterval(intervalId);
-  }, [monitoringActive, faceModelsLoaded]);
+  const totalViolations = violations.length;
 
   return (
-    <div className="monitor-panel" style={{
+    <div style={{
       position: 'fixed',
-      top: '10px',
-      right: '10px',
-      background: '#fff',
-      border: '1px solid var(--border)',
-      borderRadius: '8px',
-      padding: '12px',
-      zIndex: 1000,
-      minWidth: '280px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      top: 12,
+      right: 12,
+      width: 220,
+      background: 'rgba(15,23,42,0.92)',
+      backdropFilter: 'blur(12px)',
+      border: `1.5px solid ${totalViolations > 3 ? '#ef4444' : '#334155'}`,
+      borderRadius: 14,
+      padding: '12px 14px',
+      zIndex: 9999,
+      color: '#f1f5f9',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: 12,
+      boxShadow: totalViolations > 3
+        ? '0 0 0 3px rgba(239,68,68,0.25), 0 8px 32px rgba(0,0,0,0.4)'
+        : '0 8px 32px rgba(0,0,0,0.4)',
+      transition: 'border-color 0.3s, box-shadow 0.3s',
     }}>
-      <h4 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 'bold' }}>Exam Proctoring</h4>
-
-      {/* Webcam Feed (Miniature) */}
-      <div style={{ marginBottom: '10px', textAlign: 'center' }}>
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          muted 
-          playsInline
-          style={{ 
-            width: '100%', 
-            maxWidth: '120px', 
-            borderRadius: '4px', 
-            border: faceDetected ? '2px solid #4caf50' : '2px solid #f44336' 
-          }} 
-        />
-        {!faceDetected && (
-          <p style={{ color: '#f44336', margin: '5px 0 0', fontSize: '11px', fontWeight: 'bold' }}>
-            🚨 Face not detected!
-          </p>
-        )}
-      </div>
-
-      {/* Location Status */}
-      <div style={{ marginBottom: '10px', fontSize: '12px' }}>
-        <p style={{ margin: '5px 0' }}>
-          📍 Location: <span style={{ color: initialLocation ? '#4caf50' : '#f44336' }}>
-            {initialLocation ? 'Verified' : 'Checking...'}
-          </span>
-        </p>
-        {locationWarning && (
-          <p style={{ margin: '5px 0', color: '#ff9800', fontWeight: 'bold' }}>
-            ⚠️ {locationWarning}
-          </p>
-        )}
-      </div>
-
-      {/* Warnings */}
-      {tabSwitchWarning && (
-        <div style={{
-          background: '#fff3cd',
-          border: '1px solid #ffc107',
-          color: '#856404',
-          padding: '8px',
-          borderRadius: '4px',
-          marginBottom: '10px',
-          fontSize: '12px'
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, borderBottom: '1px solid #334155', paddingBottom: 8 }}>
+        <span style={{ fontSize: 14 }}>🛡️</span>
+        <span style={{ fontWeight: 700, fontSize: 13, letterSpacing: '-0.2px' }}>Proctoring Active</span>
+        <span style={{
+          marginLeft: 'auto',
+          fontSize: 10,
+          fontWeight: 600,
+          padding: '2px 7px',
+          borderRadius: 99,
+          background: statusText === 'Active' ? 'rgba(16,185,129,0.2)' : 'rgba(251,191,36,0.2)',
+          color:      statusText === 'Active' ? '#10b981' : '#fbbf24',
+          border:     `1px solid ${statusText === 'Active' ? '#10b981' : '#fbbf24'}`,
         }}>
-          ⚠️ Do not switch tabs during exam!
-        </div>
-      )}
-
-      {windowBlurWarning && (
-        <div style={{
-          background: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          color: '#721c24',
-          padding: '8px',
-          borderRadius: '4px',
-          marginBottom: '10px',
-          fontSize: '12px'
-        }}>
-          ⚠️ Keep window focused!
-        </div>
-      )}
-
-      {/* Violation Count */}
-      <div style={{ fontSize: '12px', marginBottom: '10px', padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
-        <p style={{ margin: '3px 0' }}>Tab Switches: <strong>{tabSwitchCountRef.current}</strong></p>
-        <p style={{ margin: '3px 0' }}>Window Blurs: <strong>{blurCountRef.current}</strong></p>
-        <p style={{ margin: '3px 0' }}>Total Violations: <strong style={{ color: violations.length > 5 ? '#f44336' : '#333' }}>{violations.length}</strong></p>
-      </div>
-
-      {violations.length > 5 && (
-        <div style={{
-          background: '#ffebee',
-          border: '2px solid #f44336',
-          color: '#c62828',
-          padding: '8px',
-          borderRadius: '4px',
-          marginBottom: '10px',
-          fontSize: '11px',
-          fontWeight: 'bold'
-        }}>
-          🚨 Too many violations! Exam may be flagged.
-        </div>
-      )}
-
-      {/* Status */}
-      <p style={{ margin: '10px 0 0', fontSize: '11px', color: '#666' }}>
-        Status: <span style={{ color: monitoringActive ? '#4caf50' : '#f44336' }}>
-          {monitoringActive ? '● Active' : '● Inactive'}
+          {statusText === 'Active' ? '● LIVE' : '◌ ' + statusText}
         </span>
-      </p>
+      </div>
+
+      {/* Camera feed */}
+      <div style={{ position: 'relative', marginBottom: 10, borderRadius: 8, overflow: 'hidden',
+        border: `2px solid ${cameraStatus === 'ok' ? (faceDetected ? '#10b981' : '#ef4444') : '#64748b'}` }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ width: '100%', display: 'block', borderRadius: 6, background: '#0f172a' }}
+        />
+        {cameraStatus === 'loading' && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(15,23,42,0.8)', fontSize: 10, color: '#94a3b8' }}>
+            Starting camera…
+          </div>
+        )}
+        {cameraStatus === 'blocked' && (
+          <div style={{ padding: '8px', fontSize: 10, color: '#f87171', textAlign: 'center' }}>
+            📷 Camera blocked
+          </div>
+        )}
+        {cameraStatus === 'ok' && !faceDetected && (
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(239,68,68,0.85)',
+            fontSize: 10, fontWeight: 700, textAlign: 'center', padding: '3px', color: 'white' }}>
+            🚨 No face detected
+          </div>
+        )}
+      </div>
+
+      {/* Status rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
+        <StatusRow icon="📷" label="Camera" status={cameraStatus === 'ok' ? 'ok' : cameraStatus === 'blocked' ? 'err' : 'loading'} text={cameraStatus === 'ok' ? 'Active' : cameraStatus === 'blocked' ? 'Blocked' : 'Loading'} />
+        <StatusRow icon="📍" label="Location" status={locationStatus === 'ok' ? 'ok' : locationStatus === 'denied' ? 'warn' : 'loading'} text={locationStatus === 'ok' ? 'Verified' : locationStatus === 'denied' ? 'Unavailable' : 'Detecting'} />
+        <StatusRow icon="👤" label="Face" status={faceDetected ? 'ok' : 'err'} text={faceDetected ? 'Detected' : 'Missing'} />
+        <StatusRow icon="🚫" label="Violations" status={totalViolations === 0 ? 'ok' : totalViolations < 3 ? 'warn' : 'err'} text={`${totalViolations}`} />
+      </div>
+
+      {/* Warning banner */}
+      {warningVisible && lastWarning && (
+        <div style={{
+          background: 'rgba(239,68,68,0.15)',
+          border: '1px solid rgba(239,68,68,0.5)',
+          borderRadius: 8,
+          padding: '7px 9px',
+          fontSize: 11,
+          color: '#fca5a5',
+          fontWeight: 600,
+          animation: 'fadeIn 0.2s ease',
+          wordBreak: 'break-word',
+          marginTop: 2,
+        }}>
+          {lastWarning}
+        </div>
+      )}
+
+      {totalViolations > 3 && (
+        <div style={{ marginTop: 8, padding: '6px 8px', background: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444',
+          borderRadius: 8, fontSize: 10, fontWeight: 700, color: '#f87171', textAlign: 'center' }}>
+          ⚠️ HIGH VIOLATION COUNT — Exam may be cancelled!
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StatusRow = ({ icon, label, status, text }) => {
+  const colors = {
+    ok:      { bg: 'rgba(16,185,129,0.1)',  text: '#34d399', dot: '#10b981' },
+    warn:    { bg: 'rgba(251,191,36,0.1)',  text: '#fbbf24', dot: '#f59e0b' },
+    err:     { bg: 'rgba(239,68,68,0.1)',   text: '#f87171', dot: '#ef4444' },
+    loading: { bg: 'rgba(148,163,184,0.1)', text: '#94a3b8', dot: '#64748b' },
+  };
+  const c = colors[status] || colors.loading;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
+      background: c.bg, borderRadius: 6 }}>
+      <span style={{ fontSize: 11 }}>{icon}</span>
+      <span style={{ flex: 1, color: '#cbd5e1', fontSize: 11 }}>{label}</span>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+      <span style={{ color: c.text, fontWeight: 600, fontSize: 11 }}>{text}</span>
     </div>
   );
 };

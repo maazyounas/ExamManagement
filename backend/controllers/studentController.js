@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Exam = require('../models/Exam');
 const Result = require('../models/Result');
+const MonitoringSession = require('../models/MonitoringSession');
 const { isStudentEnrolled, toObjectId } = require('../utils/enrollment');
 
 exports.getProfile = async (req, res) => {
@@ -112,7 +113,7 @@ exports.getExamForTaking = async (req, res) => {
 };
 
 exports.submitExam = async (req, res) => {
-  const { answers, timeTracker } = req.body;
+  const { answers, timeTracker, cancelledDueToViolation } = req.body;
   try {
     const exam = await Exam.findById(req.params.id).populate('questions');
     if (!exam) {
@@ -153,8 +154,28 @@ exports.submitExam = async (req, res) => {
       totalQuestions,
       percentage,
       submittedAt: new Date(),
+      cancelledDueToViolation: !!cancelledDueToViolation,
     });
     await result.save();
+
+    // If cancelled due to violation, ensure any active proctoring session is updated
+    if (cancelledDueToViolation) {
+      try {
+        const session = await MonitoringSession.findOne({
+          student: req.user.id,
+          exam: req.params.id,
+        }).sort({ startTime: -1 });
+        if (session) {
+          session.status = 'flagged';
+          if (!session.endTime) {
+            session.endTime = new Date();
+          }
+          await session.save();
+        }
+      } catch (monErr) {
+        console.error('Failed to flag proctoring session during violation submit:', monErr);
+      }
+    }
 
     res.json({ message: 'Exam submitted', score, totalQuestions, percentage });
   } catch (err) {

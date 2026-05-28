@@ -40,8 +40,9 @@ async function test() {
     }, eduToken);
     const qId = qRes._id;
     
+    const groupCode = `TEST_GRP_${Date.now()}`;
     const eRes = await request('/educators/exams', 'POST', {
-      groupId: 'TEST_GRP',
+      groupId: groupCode,
       title: 'Monitoring Test Exam',
       scheduledDate: new Date(Date.now() - 10000).toISOString(),
       duration: 10,
@@ -51,7 +52,7 @@ async function test() {
     
     console.log("4. Student enrolling and starting monitoring...");
     // Enroll via joinExam
-    await request('/students/join', 'POST', { examCode: 'TEST_GRP' }, stuToken);
+    await request('/students/join', 'POST', { examCode: groupCode }, stuToken);
 
     // Get Exam
     await request(`/students/exam/${examId}`, 'GET', null, stuToken);
@@ -67,16 +68,27 @@ async function test() {
     
     await request(`/students/submit/${examId}`, 'POST', {
       answers: { [qId]: '4' },
-      timeTracker: { [qId]: 5 }
+      timeTracker: { [qId]: 5 },
+      cancelledDueToViolation: true
     }, stuToken);
     
-    console.log("7. Educator fetching monitoring data...");
+    console.log("7. Verifying Result document cancelled status...");
+    const results = await request('/students/results', 'GET', null, stuToken);
+    const resultObj = results.find(r => r.exam?._id === examId);
+    if (resultObj && resultObj.cancelledDueToViolation === true) {
+      console.log("✅ SUCCESS! Result marked as cancelled due to violation in DB.");
+    } else {
+      console.log("❌ FAILED: Result was not marked as cancelled due to violation in DB.", resultObj);
+    }
+
+    console.log("8. Educator fetching monitoring data...");
     const monFetchRes = await request(`/monitoring/exam/${examId}`, 'GET', null, eduToken);
     
     const sessions = monFetchRes;
     if (sessions.length > 0 && sessions[0].violations.length > 0) {
       console.log(`✅ SUCCESS! Found ${sessions[0].violations.length} violations for student.`);
       console.log("Violation details:", sessions[0].violations[0].type);
+      console.log("Session status:", sessions[0].status);
     } else {
       console.log("❌ FAILED: No violations found in educator dashboard.");
       console.log("Sessions data:", JSON.stringify(sessions));

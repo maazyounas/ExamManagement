@@ -133,7 +133,9 @@ const Monitoring = () => {
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                         <span className={vLevel.cls}>{vLevel.label}</span>
-                        <span className={getStatusCls(session.status)}>{session.status}</span>
+                        <span className={getStatusCls(session.status)}>
+                          {session.status === 'flagged' ? '🚨 Cancelled' : session.status}
+                        </span>
                       </div>
                     </div>
 
