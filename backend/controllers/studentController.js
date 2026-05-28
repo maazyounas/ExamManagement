@@ -132,7 +132,7 @@ exports.submitExam = async (req, res) => {
     let score = 0;
     const totalQuestions = exam.questions.length;
     exam.questions.forEach(q => {
-      if (answers[q._id] === q.correctAnswer) {
+      if (answers && answers[q._id] === q.correctAnswer) {
         score++;
       }
     });

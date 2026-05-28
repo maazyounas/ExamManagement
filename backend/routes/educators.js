@@ -15,7 +15,8 @@ const {
   getExams,
   getStudentPerformance,
   generateReport,
-  getStudents
+  getStudents,
+  recollectExam
 } = require('../controllers/educatorController');
 
 router.use(auth);
@@ -35,5 +36,6 @@ router.delete('/exams/:id', deleteExam);
 router.get('/exams', getExams);
 router.get('/performance', getStudentPerformance);
 router.get('/reports', generateReport);
+router.delete('/exams/:examId/recollect/:studentId', recollectExam);
 
 module.exports = router;

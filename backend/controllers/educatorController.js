@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Exam = require('../models/Exam');
 const Question = require('../models/Question');
 const Result = require('../models/Result');
+const MonitoringSession = require('../models/MonitoringSession');
 
 exports.getProfile = async (req, res) => {
   try {
@@ -338,25 +339,65 @@ exports.generateReport = async (req, res) => {
         ? results.reduce((sum, r) => sum + (r.percentage || 0), 0) / totalStudents
         : 0;
 
+      const sessions = await MonitoringSession.find({ exam: exam._id });
+      const sessionMap = {};
+      sessions.forEach(s => {
+        if (s.student) {
+          sessionMap[s.student.toString()] = s;
+        }
+      });
+
       reports.push({
         examId: exam._id,
         examTitle: exam.title,
         averageScore,
         totalStudents,
-        results: results.map((result) => ({
-          resultId: result._id,
-          studentId: result.student?.studentId || result.student?._id || null,
-          studentName: result.student?.name || 'Unknown',
-          score: result.score,
-          totalQuestions: result.totalQuestions,
-          percentage: result.percentage,
-          submittedAt: result.submittedAt,
-        })),
+        results: results.map((result) => {
+          const session = result.student ? sessionMap[result.student._id.toString()] : null;
+          return {
+            resultId: result._id,
+            studentId: result.student?.studentId || result.student?._id || null,
+            studentMongoId: result.student?._id || null,
+            studentName: result.student?.name || 'Unknown',
+            score: result.score,
+            totalQuestions: result.totalQuestions,
+            percentage: result.percentage,
+            submittedAt: result.submittedAt,
+            totalViolations: session ? session.totalViolations : 0,
+            monitoringStatus: session ? session.status : 'none'
+          };
+        }),
       });
     }
 
     res.json(reports);
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.recollectExam = async (req, res) => {
+  const { examId, studentId } = req.params;
+  try {
+    // Verify that the exam belongs to the educator
+    const exam = await Exam.findOne({ _id: examId, educator: req.user.id });
+    if (!exam) {
+      return res.status(403).json({ message: 'Not authorized to manage this exam' });
+    }
+
+    // Delete the Result document
+    const resultDelete = await Result.deleteOne({ exam: examId, student: studentId });
+
+    // Delete the MonitoringSession document
+    const monitoringDelete = await MonitoringSession.deleteOne({ exam: examId, student: studentId });
+
+    res.json({
+      message: 'Exam recollected successfully. Student can retake the exam.',
+      resultDeleted: resultDelete.deletedCount > 0,
+      monitoringDeleted: monitoringDelete.deletedCount > 0
+    });
+  } catch (err) {
+    console.error('recollectExam error:', err);
     res.status(500).json({ message: err.message });
   }
 };

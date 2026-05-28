@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../lib/api.js';
 
 const Monitoring = () => {
   const [exams, setExams] = useState([]);
@@ -8,13 +8,23 @@ const Monitoring = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [recollecting, setRecollecting] = useState(null);
 
   useEffect(() => { fetchExams(); }, []);
+
+  const fetchSessions = async (examId) => {
+    setDetailsLoading(true);
+    try {
+      const res = await api.get(`/monitoring/exam/${examId}`);
+      setSessions(res.data);
+    } catch (err) { console.error(err); }
+    finally { setDetailsLoading(false); }
+  };
 
   const fetchExams = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/educators/exams');
+      const res = await api.get('/educators/exams');
       setExams(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -23,12 +33,20 @@ const Monitoring = () => {
   const handleSelectExam = async (examId) => {
     setSelectedExam(examId);
     setExpandedId(null);
-    setDetailsLoading(true);
+    await fetchSessions(examId);
+  };
+
+  const handleRecollect = async (examId, studentId, studentName) => {
+    if (!window.confirm(`Recollect exam for ${studentName}? This will delete their submission and proctoring log, allowing them to retake the exam.`)) return;
+    setRecollecting({ examId, studentId });
     try {
-      const res = await axios.get(`http://localhost:5000/api/monitoring/exam/${examId}`);
-      setSessions(res.data);
-    } catch (err) { console.error(err); }
-    finally { setDetailsLoading(false); }
+      await api.delete(`/educators/exams/${examId}/recollect/${studentId}`);
+      await fetchSessions(examId);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to recollect exam');
+    } finally {
+      setRecollecting(null);
+    }
   };
 
   const getViolationLevel = (count) => {
@@ -141,10 +159,23 @@ const Monitoring = () => {
                     </div>
 
                     {/* Expand button */}
-                    <button className="button button--secondary button--sm button--full-width"
-                      onClick={() => setExpandedId(isExpanded ? null : session._id)}>
-                      {isExpanded ? '▲ Hide Timeline' : '▼ View Violation Timeline'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <button className="button button--secondary button--sm"
+                        style={{ flex: 1 }}
+                        onClick={() => setExpandedId(isExpanded ? null : session._id)}>
+                        {isExpanded ? '▲ Hide Timeline' : '▼ View Violation Timeline'}
+                      </button>
+                      {session.totalViolations > 0 && session.student?._id && (
+                        <button
+                          className="button button--danger button--sm"
+                          disabled={!!(recollecting?.examId === selectedExam && recollecting?.studentId === session.student._id)}
+                          onClick={() => handleRecollect(selectedExam, session.student._id, session.student?.name || 'Student')}
+                          title="Delete submission and allow student to retake"
+                        >
+                          {recollecting?.examId === selectedExam && recollecting?.studentId === session.student._id ? '⏳…' : '🔄 Recollect'}
+                        </button>
+                      )}
+                    </div>
 
                     {/* Timeline */}
                     {isExpanded && (
